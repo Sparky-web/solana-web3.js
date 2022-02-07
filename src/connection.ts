@@ -43,6 +43,7 @@ import type {Blockhash} from './blockhash';
 import type {FeeCalculator} from './fee-calculator';
 import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
+import {RpcWebSocketClient as RpcWebSocketClientNew} from "rpc-websocket-client";
 
 const PublicKeyFromString = coerce(
   instance(PublicKey),
@@ -856,6 +857,38 @@ function createRpcClient(
   }, {});
 
   return clientBrowser;
+}
+
+
+async function createRpcWsClient(
+    url: string
+): Promise<RpcWebSocketClientNew> {
+  const rpc = new RpcWebSocketClientNew();
+  await rpc.connect(url.replace(/https/ig, "wss"));
+
+  return rpc
+}
+
+function createRpcWsRequest(client: RpcWebSocketClientNew) {
+  return async (method: any, args: any) => {
+    return {
+      result: await client.call(method, args),
+      jsonrpc: '2.0',
+      id: 'af904048-e0e2-4a0f-ab4c-312c69ad32b1'
+    }
+  }
+}
+
+function createRpcWsBatchRequest(client: RpcWebSocketClientNew) {
+  return async (requests: RpcParams[]) => {
+    return await Promise.all(requests.map(async params => {
+      return {
+        result: await client.call(params.methodName, params.args),
+        jsonrpc: '2.0',
+        id: 'af904048-e0e2-4a0f-ab4c-312c69ad32b1'
+      }
+    }))
+  }
 }
 
 function createRpcRequest(client: RpcClient): RpcRequest {
@@ -2081,7 +2114,7 @@ export class Connection {
   /** @internal */ _confirmTransactionInitialTimeout?: number;
   /** @internal */ _rpcEndpoint: string;
   /** @internal */ _rpcWsEndpoint: string;
-  /** @internal */ _rpcClient: RpcClient;
+  /** @internal */ _rpcClient: RpcClient | RpcWebSocketClientNew;
   /** @internal */ _rpcRequest: RpcRequest;
   /** @internal */ _rpcBatchRequest: RpcBatchRequest;
   /** @internal */ _rpcWebSocket: RpcWebSocketClient;
@@ -2181,6 +2214,7 @@ export class Connection {
       fetchMiddleware,
       disableRetryOnRateLimit,
     );
+
     this._rpcRequest = createRpcRequest(this._rpcClient);
     this._rpcBatchRequest = createRpcBatchRequest(this._rpcClient);
 
@@ -2219,6 +2253,12 @@ export class Connection {
       'logsNotification',
       this._wsOnLogsNotification.bind(this),
     );
+  }
+
+  async replaceWithWsClient() {
+    this._rpcClient = await createRpcWsClient(this._rpcEndpoint)
+    this._rpcRequest = createRpcWsRequest(this._rpcClient)
+    this._rpcBatchRequest = createRpcWsBatchRequest(this._rpcClient)
   }
 
   /**
