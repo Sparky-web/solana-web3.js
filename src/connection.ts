@@ -874,10 +874,22 @@ function createRpcWsRequest(client: RpcWebSocketClientNew) {
     return {
       result: await client.call(method, args),
       jsonrpc: '2.0',
-      id: 'af904048-e0e2-4a0f-ab4c-312c69ad32b1'
+      id: uuid()
     }
   }
 }
+
+function uuid() {
+        const template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+        const xAndYOnly = /[xy]/g;
+
+        return template.replace(xAndYOnly, (character) => {
+            const randomNo =  Math.floor(Math.random() * 16);
+            const newValue = character === 'x' ? randomNo : (randomNo & 0x3) | 0x8;
+
+            return newValue.toString(16);
+        });
+    }
 
 function createRpcWsBatchRequest(client: RpcWebSocketClientNew) {
   return async (requests: RpcParams[]) => {
@@ -885,7 +897,7 @@ function createRpcWsBatchRequest(client: RpcWebSocketClientNew) {
       return {
         result: await client.call(params.methodName, params.args),
         jsonrpc: '2.0',
-        id: 'af904048-e0e2-4a0f-ab4c-312c69ad32b1'
+        id: uuid()
       }
     }))
   }
